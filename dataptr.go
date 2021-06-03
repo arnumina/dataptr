@@ -14,8 +14,6 @@ package dataptr
 import (
 	"encoding/json"
 	"errors"
-	"fmt"
-	"strings"
 	"time"
 
 	"github.com/arnumina/failure"
@@ -76,25 +74,28 @@ func (dp *DataPtr) Value() interface{} {
 
 // Get AFAIRE.
 func (dp *DataPtr) Get(keys ...string) (string, *DataPtr, error) {
-	ptr := fmt.Sprintf("/%s", strings.Join(append([]string{}, keys...), "/"))
-
-	if ptr == "/" {
-		return ptr, dp, nil
+	if len(keys) == 0 {
+		// Note: this is not respecting the JSON Pointer spec
+		// "/" should instead point to the property named "" (empty string) of an object at root
+		return "/", dp, nil
 	}
 
-	value, err := jsonptr.Get(dp.value, ptr)
+	ptr := jsonptr.Pointer(keys)
+	ptrStr := ptr.String()
+
+	value, err := ptr.In(dp.value)
 	if err != nil {
 		if errors.Is(err, jsonptr.ErrProperty) {
-			return ptr, nil,
+			return ptr.String(), nil,
 				failure.New(ErrNotFound).
-					Set("pointer", ptr).
+					Set("pointer", ptrStr).
 					Msg("the referenced data does not exist") //////////////////////////////////////////////////////////
 		}
 
-		return ptr, nil, err
+		return ptrStr, nil, err
 	}
 
-	return ptr, New(value), nil
+	return ptrStr, New(value), nil
 }
 
 // MaybeGet AFAIRE.
